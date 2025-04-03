@@ -1,36 +1,9 @@
 const todoForm = document.querySelector('form');
 const todoInput = document.getElementById('todo-input');
 const todoListUL = document.getElementById('todo-list');
-const progressBar = document.getElementById('progress-bar');
-const progressText = document.getElementById('progress-text');
 
 let allTodos = getTodos();
-
-// Create confetti container
-const confettiContainer = document.createElement('div');
-confettiContainer.className = 'confetti-container';
-document.body.appendChild(confettiContainer);
-
-// Function to create confetti pieces
-function createConfetti() {
-    confettiContainer.innerHTML = '';
-    const colors = ['#00A8E8', '#F9F9F9', '#4A4D57', '#ff0033', '#ffcc00'];
-    
-    for (let i = 0; i < 100; i++) {
-        const confetti = document.createElement('div');
-        confetti.className = 'confetti-piece';
-        confetti.style.left = Math.random() * 100 + 'vw';
-        confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
-        confetti.style.width = Math.random() * 10 + 5 + 'px';
-        confetti.style.height = Math.random() * 10 + 5 + 'px';
-        confetti.style.animationDuration = Math.random() * 2 + 2 + 's';
-        confetti.style.animationDelay = Math.random() * 0.5 + 's';
-        confettiContainer.appendChild(confetti);
-    }
-}
-
 updateTodoList();
-updateProgressBar();
 
 todoForm.addEventListener('submit', function(e){
     e.preventDefault();
@@ -46,51 +19,28 @@ function addTodo(){
         allTodos.push(todoObject);
         updateTodoList();
         saveTodos();
-        updateProgressBar();
         todoInput.value = "";
     }
 }
-function updateProgressBar() {
-    const totalTasks = allTodos.length;
-    if (totalTasks === 0) {
-        progressBar.style.width = '0%';
-        progressText.textContent = '0/0';
-        return;
-    }
-    
-    const completedTasks = allTodos.filter(todo => todo.completed).length;
-    const percentage = Math.round((completedTasks / totalTasks) * 100);
-    
-    progressBar.style.width = `${percentage}%`;
-    progressText.textContent = `${completedTasks}/${totalTasks}`;
-    
-    // Add celebration animation when all tasks are completed
-    if (completedTasks === totalTasks && totalTasks > 0) {
-        document.body.classList.add('celebration');
-        createConfetti();
-        setTimeout(() => {
-            document.body.classList.remove('celebration');
-        }, 3000);
-    } else {
-        document.body.classList.remove('celebration');
-    }
-}
-
 function updateTodoList(){
     todoListUL.innerHTML = "";
     
-    // Sort todos: uncompleted first, then completed
+    // Sort todos: incomplete first, then completed
     const sortedTodos = [...allTodos].sort((a, b) => {
         if (a.completed === b.completed) return 0;
-        return a.completed ? 1 : -1;
+        return a.completed ? 1 : -1; // Put incomplete tasks first
     });
     
-    sortedTodos.forEach((todo, displayIndex) => {
-        // Find the original index in allTodos array
+    // Create and append todo items in the new order
+    sortedTodos.forEach((todo, index) => {
+        // Find the original index in allTodos array to maintain correct references
         const originalIndex = allTodos.findIndex(t => t === todo);
         let todoItem = createTodoItem(todo, originalIndex);
         todoListUL.append(todoItem);
-    })
+    });
+    
+    // Update progress bar
+    updateProgressBar();
 }
 function createTodoItem(todo, todoIndex){
     const todoId = "todo-"+todoIndex;
@@ -121,8 +71,8 @@ function createTodoItem(todo, todoIndex){
     checkbox.addEventListener("click", ()=>{
         allTodos[todoIndex].completed = checkbox.checked;
         saveTodos();
-        updateProgressBar();
-        updateTodoList(); // Re-sort the list when completion status changes
+        updateTodoList(); // Update the list to reorder and update progress
+        checkAllCompleted(); // Check if all tasks are complete
     })    
     checkbox.checked = todo.completed;
     return todoLI;
@@ -131,7 +81,6 @@ function deleteTodoItem(todoIndex){
     allTodos = allTodos.filter((_, i)=> i !== todoIndex);
     saveTodos();
     updateTodoList();
-    updateProgressBar();
 }
 function saveTodos(){
     const todosJson = JSON.stringify(allTodos)
@@ -140,4 +89,78 @@ function saveTodos(){
 function getTodos(){
     const todos = localStorage.getItem("todos") || "[]";
     return JSON.parse(todos);
+}
+
+// Update the progress bar with the current completion ratio
+function updateProgressBar() {
+    const totalTasks = allTodos.length;
+    const completedTasks = allTodos.filter(todo => todo.completed).length;
+    
+    // Update the progress text (fraction)
+    const progressText = document.querySelector('.progress-text');
+    progressText.textContent = `${completedTasks}/${totalTasks}`;
+    
+    // Update the progress bar fill
+    const progressFill = document.querySelector('.progress-fill');
+    const progressPercentage = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+    progressFill.style.width = `${progressPercentage}%`;
+}
+
+// Check if all tasks are complete and trigger celebration if they are
+function checkAllCompleted() {
+    if (allTodos.length === 0) return; // Don't celebrate if there are no tasks
+    
+    const allCompleted = allTodos.every(todo => todo.completed);
+    
+    if (allCompleted) {
+        startCelebration();
+    } else {
+        stopCelebration();
+    }
+}
+
+// Start the celebration animation
+function startCelebration() {
+    // Add the celebration container if it doesn't exist
+    if (!document.querySelector('.celebration-container')) {
+        const celebrationContainer = document.createElement('div');
+        celebrationContainer.className = 'celebration-container';
+        document.body.appendChild(celebrationContainer);
+        
+        // Create confetti elements
+        for (let i = 0; i < 100; i++) {
+            const confetti = document.createElement('div');
+            confetti.className = 'confetti';
+            // Set CSS variables for random movement direction
+            confetti.style.setProperty('--random-x', Math.random());
+            confetti.style.setProperty('--random-y', Math.random());
+            confetti.style.setProperty('--random-rotate', Math.random());
+            confetti.style.animationDelay = `${Math.random() * 1.0}s`; // Increased from 0.3s to 1.0s for slower appearance
+            confetti.style.backgroundColor = getRandomColor();
+            celebrationContainer.appendChild(confetti);
+        }
+    }
+    
+    // Show the celebration
+    document.querySelector('.celebration-container').classList.add('active');
+    
+    // Automatically stop celebration after 5 seconds
+    setTimeout(stopCelebration, 7000);
+}
+
+// Stop the celebration animation
+function stopCelebration() {
+    const celebrationContainer = document.querySelector('.celebration-container');
+    if (celebrationContainer) {
+        celebrationContainer.classList.remove('active');
+    }
+}
+
+// Helper function to generate random colors for confetti
+function getRandomColor() {
+    const colors = [
+        '#ff0000', '#00ff00', '#0000ff', '#ffff00', 
+        '#ff00ff', '#00ffff', '#ff8000', '#8000ff'
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
 }
